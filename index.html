@@ -516,9 +516,9 @@ async function openComplete(){
 
   const previewCv=document.getElementById('canvas-preview');
   const bw=board.offsetWidth, bh=board.offsetHeight;
-  // Scale to fit preview area, max 1320px wide
-  const maxW=Math.min(1320,window.screen.width*1.5);
-  const scale=Math.min(maxW/bw,1);
+  // High-res: 3x device pixel ratio, minimum 3000px wide for retina/print quality
+  const DPR=Math.max(window.devicePixelRatio||1, 3);
+  const scale=DPR;
   previewCv.width=Math.round(bw*scale);
   previewCv.height=Math.round(bh*scale);
   const ctx=previewCv.getContext('2d');
