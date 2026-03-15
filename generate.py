@@ -22,12 +22,13 @@ ARTIST = {
     "name":      "常闇",
     "name_en":   "tokoyami",
     "tagline":   "a quiet archive",
-    "twitter":   "keer_pmom",        # X (Twitter) のID（@なし）例: "tokoyami_photo"
-    "instagram": "loodmmm",        # Instagram のID 例: "tokoyami.photo"
+    "twitter":   "",        # X (Twitter) のID（@なし）例: "tokoyami_photo"
+    "instagram": "",        # Instagram のID 例: "tokoyami.photo"
 }
 # ─────────────────────────────────────
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif",
+                    ".JPG", ".JPEG", ".PNG", ".WEBP"}  # case-insensitive support
 IMAGES_DIR = Path("images")
 OUTPUT_FILE = Path("images.json")
 
@@ -71,8 +72,13 @@ def scan_images() -> list:
     works = []
     for f in files:
         meta = parse_filename(f.stem)
+        # Normalize extension to lowercase for GitHub Pages (case-sensitive server)
+        normalized_name = f.stem + f.suffix.lower()
+        if normalized_name != f.name:
+            print(f"  ⚠ 大文字拡張子を正規化: {f.name} → {normalized_name}")
+            print(f"    GitHubで該当ファイルを {normalized_name} にリネームしてください")
         works.append({
-            "file":  f.name,
+            "file":  normalized_name,
             "title": meta["title"],
             "year":  meta["year"],
         })
