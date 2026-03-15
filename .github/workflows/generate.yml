@@ -1,0 +1,40 @@
+name: Generate images.json
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "images/**"        # images/ に変更があったときだけ実行
+      - "generate.py"
+      - ".github/workflows/generate.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run generate.py
+        run: python generate.py
+
+      - name: Commit images.json if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add images.json
+          if git diff --cached --quiet; then
+            echo "images.json に変更なし。スキップ。"
+          else
+            git commit -m "chore: update images.json [skip ci]"
+            git push
+          fi
