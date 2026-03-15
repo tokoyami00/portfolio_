@@ -96,7 +96,13 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9900;o
 #drop-overlay.active{opacity:1;pointer-events:all;}
 #drop-overlay p{font-family:'EB Garamond',serif;font-size:20px;font-style:italic;letter-spacing:.1em;color:var(--ink2);}
 #drop-overlay small{font-family:'Shippori Mincho',serif;font-size:10px;letter-spacing:.3em;color:var(--ink3);}
+#drop-overlay-close{position:absolute;top:28px;right:36px;background:none;border:none;cursor:pointer;font-size:24px;color:var(--ink3);transition:color .2s;line-height:1;pointer-events:all;}
+#drop-overlay-close:hover{color:var(--ink);}
 #file-input{display:none;}
+/* Portfolio photos hidden in visitor mode */
+.visitor-mode .portfolio-photo{display:none !important;}
+/* back-to-upload button */
+#btn-back-upload{display:none;}
 
 /* SHARE PANEL */
 #share-panel{position:fixed;inset:0;z-index:800;background:rgba(246,242,236,.95);backdrop-filter:blur(24px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;opacity:0;pointer-events:none;transition:opacity .4s;}
@@ -181,6 +187,8 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9900;o
   <div class="nav-sep"></div>
   <button class="nav-btn" id="btn-upload" style="display:none">+ 写真を追加</button>
   <div class="nav-sep" id="nav-sep-up" style="display:none"></div>
+  <button class="nav-btn" id="btn-back-upload">↩ 最初から</button>
+  <div class="nav-sep" id="nav-sep-back" style="display:none"></div>
   <button class="nav-btn" id="btn-share">share</button>
 </div>
 <input type="file" id="file-input" accept="image/*" multiple>
@@ -188,6 +196,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9900;o
 <div id="info-line"><span id="info-text">ドラッグして鑑賞する</span></div>
 
 <div id="drop-overlay">
+  <button id="drop-overlay-close" title="戻る">×</button>
   <p>写真をドロップ</p>
   <small>または クリックして選択</small>
 </div>
@@ -309,6 +318,7 @@ async function loadConfig(){
 }
 
 // ── ZONE BUILDER ──
+let buildZonesCount=0; // tracks how many zones belong to portfolio layout
 function buildZones(n){
   const cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols);
   const mx=60,my=95,cw=(innerWidth-mx*2)/cols,ch=(innerHeight-my-80)/rows;
@@ -317,6 +327,7 @@ function buildZones(n){
     if(ZONES.length>=n)break;
     ZONES.push({x:Math.round(mx+c*cw+cw*.06),y:Math.round(my+r*ch+ch*.06),w:Math.round(cw*.82),h:Math.round(ch*.82)});
   }
+  buildZonesCount=ZONES.length;
 }
 
 function renderZoneHints(){
@@ -343,7 +354,7 @@ const ITEM_MAX_H = 320; // cap for very tall images
 
 function makeItem(work, pos, idx, imgSrc) {
   const wrap = document.createElement('div');
-  wrap.className = 'photo-item';
+  wrap.className = 'photo-item' + (imgSrc ? '' : ' portfolio-photo');
   wrap.dataset.idx = idx;
   wrap.style.cssText = `left:${pos.x}px;top:${pos.y}px;z-index:${zTop++};transform:rotate(${pos.r}deg);opacity:0;`;
 
@@ -470,6 +481,12 @@ function applyMode(){
   document.getElementById('nav-sep-up').style.display=isP?'none':'flex';
   document.getElementById('info-text').textContent=isP?'ドラッグして鑑賞する':'写真を追加してドラッグで配置する';
   document.querySelectorAll('.zone-hint').forEach(z=>z.style.display=isP?'none':'block');
+  // Toggle class on board so .portfolio-photo gets hidden in visitor mode
+  board.classList.toggle('visitor-mode',!isP);
+  // Back button: only shown in visitor mode when visitor photos exist
+  const hasVisitor = visitorItems.length > 0;
+  document.getElementById('btn-back-upload').style.display = (!isP && hasVisitor) ? 'inline-block' : 'none';
+  document.getElementById('nav-sep-back').style.display   = (!isP && hasVisitor) ? 'flex' : 'none';
   placedSet.clear();zoneSnapped.clear();totalPlaced=0;
   document.querySelectorAll('.pip').forEach(p=>p.classList.remove('placed'));
   if(!isP&&visitorItems.length===0)document.getElementById('drop-overlay').classList.add('active');
@@ -477,9 +494,44 @@ function applyMode(){
 document.getElementById('tab-portfolio').addEventListener('click',()=>switchMode('portfolio'));
 document.getElementById('tab-visitor').addEventListener('click',()=>switchMode('visitor'));
 
+// Back to upload: clear all visitor photos and show drop overlay again
+document.getElementById('btn-back-upload').addEventListener('click',()=>{
+  // Remove visitor photo elements from DOM
+  visitorItems.forEach(vidx=>{
+    const el=items[vidx];
+    if(el)el.remove();
+  });
+  // Remove visitor-added zones and pips
+  const totalZones=ZONES.length;
+  const portfolioZoneCount=CONFIG.works.length > 0 ? buildZonesCount : 0;
+  // Remove extra zones beyond portfolio count
+  while(ZONES.length > portfolioZoneCount){
+    const zi=ZONES.length-1;
+    ZONES.pop();
+    const zh=document.getElementById('zh'+zi);if(zh)zh.remove();
+    const pip=document.getElementById('pip'+zi);if(pip)pip.remove();
+  }
+  // Clear visitor tracking
+  visitorItems=[];
+  items=items.filter(el=>document.body.contains(el));
+  placedSet.clear();zoneSnapped.clear();totalPlaced=0;
+  document.querySelectorAll('.pip').forEach(p=>p.classList.remove('placed'));
+  // Hide back button
+  document.getElementById('btn-back-upload').style.display='none';
+  document.getElementById('nav-sep-back').style.display='none';
+  // Show drop overlay
+  document.getElementById('drop-overlay').classList.add('active');
+});
+
 // ── UPLOAD ──
 const fileInput=document.getElementById('file-input'),dropOverlay=document.getElementById('drop-overlay');
 dropOverlay.addEventListener('click',()=>fileInput.click());
+// Close button: dismiss overlay and go back to portfolio mode
+document.getElementById('drop-overlay-close').addEventListener('click',e=>{
+  e.stopPropagation(); // prevent triggering file picker
+  dropOverlay.classList.remove('active');
+  switchMode('portfolio');
+});
 document.getElementById('btn-upload').addEventListener('click',()=>fileInput.click());
 fileInput.addEventListener('change',e=>{Array.from(e.target.files).forEach(loadFile);fileInput.value='';});
 board.addEventListener('dragover',e=>{e.preventDefault();if(currentMode==='visitor')dropOverlay.classList.add('active');});
@@ -492,6 +544,9 @@ function loadFile(file){
     const idx=items.length,pos=scatterPos(idx);
     makeItem({title:file.name.replace(/\.[^.]+$/,''),year:''},pos,idx,ev.target.result);
     visitorItems.push(idx);
+    // Show back-to-upload button now that visitor has photos
+    document.getElementById('btn-back-upload').style.display='inline-block';
+    document.getElementById('nav-sep-back').style.display='flex';
     const zi=ZONES.length;
     const nz={x:Math.round(Math.random()*(innerWidth-280)+40),y:Math.round(Math.random()*(innerHeight-280)+80),w:220,h:170};
     ZONES.push(nz);
