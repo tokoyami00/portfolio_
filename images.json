@@ -1,0 +1,41 @@
+{
+  "artist": {
+    "name": "常闇",
+    "name_en": "tokoyami",
+    "tagline": "a quiet archive",
+    "twitter": "keer_pmom",
+    "instagram": "loodmmm"
+  },
+  "works": [
+    {
+      "file": "01.jpg",
+      "title": "",
+      "year": ""
+    },
+    {
+      "file": "02.jpg",
+      "title": "",
+      "year": ""
+    },
+    {
+      "file": "03.jpg",
+      "title": "",
+      "year": ""
+    },
+    {
+      "file": "04.jpg",
+      "title": "",
+      "year": ""
+    },
+    {
+      "file": "05.jpg",
+      "title": "",
+      "year": ""
+    },
+    {
+      "file": "06.jpg",
+      "title": "",
+      "year": ""
+    }
+  ]
+}
