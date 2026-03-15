@@ -333,32 +333,18 @@ function makeItem(work, pos, isPortfolio, imgSrc){
   shell.style.cssText=`width:${targetW}px;height:${Math.round(targetW*.72)}px;overflow:hidden;`;
 
   const img=document.createElement('img');
-  const rawSrc = imgSrc || `images/${work.file}`;
+  img.src = imgSrc || `images/${work.file}`;
   img.alt=work.title||'';
   img.style.cssText='width:100%;height:100%;object-fit:cover;object-position:center;display:block;';
   img.crossOrigin='anonymous';
-  // Lazy load: set src only when item enters viewport
-  img.dataset.src = rawSrc;
 
-  function loadImg(){
-    img.src = img.dataset.src;
-    img.onload=()=>{
-      const ratio=img.naturalHeight/img.naturalWidth;
-      const W=targetW, H=Math.min(Math.round(W*ratio),ITEM_MAX_H);
-      shell.style.width=W+'px'; shell.style.height=H+'px';
-      addTapes(wrap,W,H);
-    };
-    img.onerror=()=>{shell.style.background='#d8d4cc';addTapes(wrap,targetW,Math.round(targetW*.72));};
-  }
-
-  if('IntersectionObserver' in window){
-    const obs=new IntersectionObserver(entries=>{
-      entries.forEach(e=>{if(e.isIntersecting){loadImg();obs.unobserve(img);}});
-    },{rootMargin:'200px'});
-    obs.observe(img);
-  } else {
-    loadImg(); // fallback
-  }
+  img.onload=()=>{
+    const ratio=img.naturalHeight/img.naturalWidth;
+    const W=targetW, H=Math.min(Math.round(W*ratio),ITEM_MAX_H);
+    shell.style.width=W+'px'; shell.style.height=H+'px';
+    addTapes(wrap,W,H);
+  };
+  img.onerror=()=>{shell.style.background='#d8d4cc';addTapes(wrap,targetW,Math.round(targetW*.72));};
 
   shell.appendChild(img);
   wrap.appendChild(shell);
