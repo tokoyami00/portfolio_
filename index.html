@@ -485,7 +485,7 @@ function makeDrag(el){
   el.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];startDrag(el,t.clientX,t.clientY);},{passive:false});
 }
 function startDrag(el,ex,ey){
-  if(currentMode==='visitor') selectItem(el);
+  selectItem(el);
   dragging=el;const r=el.getBoundingClientRect();dox=ex-r.left;doy=ey-r.top;
   el.classList.add('dragging');el.style.zIndex=zTop++;
   ring.style.width='42px';ring.style.height='42px';ring.style.borderColor='rgba(184,160,122,.8)';
