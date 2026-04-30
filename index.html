@@ -457,26 +457,19 @@ function makeResizable(wrap, handle){
   },{passive:false});
 }
 
-document.addEventListener('mousemove',e=>{
-  if(!resizing)return;
-  const dx=e.clientX-resizeStartX;
+function applyResize(clientX){
+  const dx=clientX-resizeStartX;
   const newW=Math.min(MAX_W,Math.max(MIN_W,resizeStartW+dx));
   const newH=Math.round(newW*resizeRatio);
   const shell=resizing.querySelector('.photo-shell');
   shell.style.width=newW+'px';shell.style.height=newH+'px';
-});
+  addTapes(resizing,newW,newH); // reposition tapes to follow new size
+}
+document.addEventListener('mousemove',e=>{if(resizing)applyResize(e.clientX);});
 document.addEventListener('touchmove',e=>{
-  if(!resizing)return;
-  e.preventDefault();
-  const dx=e.touches[0].clientX-resizeStartX;
-  const newW=Math.min(MAX_W,Math.max(MIN_W,resizeStartW+dx));
-  const newH=Math.round(newW*resizeRatio);
-  const shell=resizing.querySelector('.photo-shell');
-  shell.style.width=newW+'px';shell.style.height=newH+'px';
+  if(!resizing)return;e.preventDefault();applyResize(e.touches[0].clientX);
 },{passive:false});
-document.addEventListener('mouseup',e=>{
-  if(resizing){resizing=null;document.body.style.cursor='';}
-});
+document.addEventListener('mouseup',()=>{if(resizing){resizing=null;document.body.style.cursor='';}});
 document.addEventListener('touchend',()=>{resizing=null;});
 
 // ── DRAG ──
@@ -706,12 +699,41 @@ async function openComplete(){
 
   await Promise.all(draws);
 
-  // Watermark
+  // ── Frame / border ──
+  const fw=Math.round(18*scale); // frame width
+  const fc='#e8e2d8';            // frame fill (warm off-white)
+  const fc2='rgba(184,160,122,.55)'; // inner edge line
+
+  // Outer frame fill (4 sides)
+  ctx.fillStyle=fc;
+  ctx.fillRect(0,0,previewCv.width,fw);                                          // top
+  ctx.fillRect(0,previewCv.height-fw,previewCv.width,fw);                        // bottom
+  ctx.fillRect(0,0,fw,previewCv.height);                                          // left
+  ctx.fillRect(previewCv.width-fw,0,fw,previewCv.height);                        // right
+
+  // Inner edge line
+  ctx.strokeStyle=fc2;ctx.lineWidth=Math.round(1*scale);
+  ctx.strokeRect(fw+Math.round(2*scale),fw+Math.round(2*scale),
+    previewCv.width-fw*2-Math.round(4*scale),
+    previewCv.height-fw*2-Math.round(4*scale));
+
+  // Outer edge line (darkest)
+  ctx.strokeStyle='rgba(24,20,14,.12)';ctx.lineWidth=Math.round(1*scale);
+  ctx.strokeRect(Math.round(.5*scale),Math.round(.5*scale),
+    previewCv.width-Math.round(1*scale),previewCv.height-Math.round(1*scale));
+
+  // Corner accent dots
+  const cd=Math.round(4*scale),co=Math.round(9*scale);
+  ctx.fillStyle='rgba(184,160,122,.6)';
+  [[co,co],[previewCv.width-co,co],[co,previewCv.height-co],[previewCv.width-co,previewCv.height-co]]
+    .forEach(([x,y])=>{ctx.beginPath();ctx.arc(x,y,cd/2,0,Math.PI*2);ctx.fill();});
+
+  // Watermark inside frame
   const wm=`${CONFIG.artist.name} — canvas note`;
-  ctx.font=`italic ${Math.round(12*scale)}px 'EB Garamond',serif`;
-  ctx.fillStyle='rgba(154,148,142,.5)';
+  ctx.font=`italic ${Math.round(11*scale)}px 'EB Garamond',serif`;
+  ctx.fillStyle='rgba(154,148,142,.55)';
   ctx.textAlign='right';
-  ctx.fillText(wm,previewCv.width-Math.round(14*scale),previewCv.height-Math.round(12*scale));
+  ctx.fillText(wm,previewCv.width-fw-Math.round(8*scale),previewCv.height-Math.round(6*scale));
 
   genEl.style.display='none';
 
