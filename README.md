@@ -1,132 +1,164 @@
 # 常闇 — canvas note
 
-> 写真を並べて、あなただけの世界をつくる
+写真を並べて、あなただけのキャンバスをつくる
 
 ---
 
-## セットアップ
-
-### Step 1 — 写真を入れる
-
-```
-images/
-  01_息をひそめて_2023.jpg   ← ファイル名がそのままタイトル・年になる
-  02_光の縁_2022.jpg
-  03.jpg                     ← タイトルなしでもOK
-```
-
-**ファイル名のルール（任意）:**
-| ファイル名 | タイトル | 年 |
-|---|---|---|
-| `01_息をひそめて_2023.jpg` | 息をひそめて | 2023 |
-| `02_光の縁.jpg` | 光の縁 | — |
-| `portrait.jpg` | portrait | — |
-
-### Step 2 — generate.py を実行する
-
-```bash
-python generate.py
-```
-
-`images.json` が自動生成される。初回は `generate.py` の上部にある作家情報を編集：
-
-```python
-ARTIST = {
-    "name":      "常闇",        # サイトに表示される名前
-    "name_en":   "tokoyami",    # 英語表記
-    "tagline":   "a quiet archive",
-    "twitter":   "your_id",     # X (Twitter) ID（@なし）
-    "instagram": "your_id",     # Instagram ID
-}
-```
-
-### Step 3 — GitHub に push する
-
-```bash
-git init
-git add .
-git commit -m "init"
-git remote add origin https://github.com/USERNAME/REPO.git
-git push -u origin main
-```
-
-### Step 4 — GitHub Pages を有効化する
-
-1. リポジトリの **Settings → Pages**
-2. Source: `GitHub Actions` を選択
-3. 数秒〜1分で公開される
-
-公開URL: `https://USERNAME.github.io/REPO/`
-
----
-
-## 写真を追加・更新するとき
-
-```bash
-# images/ に写真を追加・削除する
-python generate.py          # images.json を再生成
-git add images/ images.json
-git commit -m "add photos"
-git push
-```
-
-push すると GitHub Actions が自動でサイトをデプロイする。
-
----
-
-## ファイル構成
+## フォルダ構成
 
 ```
 tokoyami/
-├── index.html                        # サイト本体（基本的に触らなくてOK）
-├── generate.py                       # ★ images/ をスキャンして images.json を生成
-├── images.json                       # generate.py が自動生成（手動編集も可）
-├── images/                           # ★ ここに写真を入れる
-│   ├── 01_息をひそめて_2023.jpg
+├── index.html          ← サイト本体（基本的に触らなくてOK）
+├── generate.py         ← ★ 写真を追加したらこれを実行する
+├── images.json         ← generate.py が自動生成（手動編集も可）
+├── images/             ← ★ ここに写真を入れる
+│   ├── work-01.jpg
+│   ├── work-02.jpg
 │   └── ...
 ├── .github/
 │   └── workflows/
-│       ├── generate.yml              # push 時に images.json を自動更新
-│       └── deploy.yml                # GitHub Pages へ自動デプロイ
-└── README.md
+│       └── deploy.yml  ← GitHub Pages への自動デプロイ設定
+└── README.md           ← このファイル
 ```
 
 ---
 
-## images.json を手動で編集したい場合
+## 初回セットアップ
 
-`generate.py` を実行せず直接編集できる。タイトルや順番を細かく調整したいときに使う。
+### 1. Python をインストールする
 
-```json
-{
-  "artist": {
-    "name": "常闇",
-    "name_en": "tokoyami",
-    "tagline": "a quiet archive",
-    "twitter": "your_twitter_id",
-    "instagram": "your_instagram_id"
-  },
-  "works": [
-    { "file": "01.jpg", "title": "息をひそめて", "year": "2023" },
-    { "file": "02.jpg", "title": "光の縁",       "year": "2022" }
-  ]
+[https://www.python.org/downloads/](https://www.python.org/downloads/)
+
+インストールできたか確認（コマンドプロンプトで）:
+```
+python --version
+```
+`Python 3.x.x` と表示されればOK。
+
+---
+
+### 2. generate.py を設定する
+
+`generate.py` をメモ帳などで開いて、上部の作家情報を編集:
+
+```python
+ARTIST = {
+    "name":      "常闇",           # ← サイトに表示される名前
+    "name_en":   "tokoyami",       # ← 英語表記
+    "tagline":   "a quiet archive",
+    "twitter":   "あなたのXのID",   # ← @なし。例: tokoyami_photo
+    "instagram": "あなたのIGのID",  # ← 例: tokoyami.photo
 }
 ```
 
-> ⚠️ 次に `generate.py` を実行すると上書きされる。手動編集を維持したい場合は `generate.py` を実行しない。
+---
+
+### 3. 写真を images/ フォルダに入れる
+
+```
+images/
+  work-01.jpg
+  work-02.jpg
+  work-03.jpg
+  ...
+```
+
+**ファイル名のルール:**
+- 拡張子は小文字にする（`.jpg` ○ / `.JPG` ✕）
+- スペースは使わない（`my photo.jpg` ✕ → `my-photo.jpg` ○）
 
 ---
 
-## シェア機能
+### 4. generate.py を実行する
 
-- **URL コピー** — レイアウト情報をURLにエンコードして共有
-- **X（Twitter）** — ツイート画面をサイトURL付きで開く
-- **Instagram** — URLをクリップボードにコピー → Instagramを開く（Web APIの制限のため直接投稿は不可）
+**Windowsの場合:**
+
+`tokoyami` フォルダを開いて、アドレスバーに `cmd` と入力して Enter。
+
+```
+python generate.py
+```
+
+または、`generate.py` をダブルクリックして実行。
+
+**Macの場合:**
+
+ターミナルを開いて:
+
+```bash
+cd ~/Desktop/tokoyami   # tokoyamフォルダの場所に合わせて変更
+python3 generate.py
+```
+
+実行すると `images.json` が自動生成されます。
 
 ---
 
-## 対応ブラウザ
+### 5. GitHub にアップロードする
 
-Chrome / Safari / Firefox / Edge（最新版）
+変更したファイルをすべてコミット&プッシュする:
 
-モバイルはタッチドラッグ対応。ただし最適化はデスクトップ向け。
+```
+images/ フォルダ（写真ファイル）
+images.json
+```
+
+GitHub Desktop を使っている場合は「Commit to main」→「Push origin」。
+
+---
+
+### 6. GitHub Pages を有効化する（初回のみ）
+
+1. リポジトリの **Settings → Pages**
+2. Source を **GitHub Actions** に変更
+3. 1〜2分でサイトが公開される
+
+公開URL: `https://ユーザー名.github.io/リポジトリ名/`
+
+---
+
+## 写真を追加・更新するとき（いつもの手順）
+
+```
+① images/ に写真を追加（または削除）
+② python generate.py を実行 → images.json が更新される
+③ images/ と images.json を GitHub にアップ
+④ 1〜2分でサイトに反映
+```
+
+---
+
+## 画像が表示されないときのチェックリスト
+
+| 確認項目 | 確認方法 |
+|---|---|
+| ファイルが GitHub にアップされているか | リポジトリの `images/` フォルダを確認 |
+| ファイル名が一致しているか | `images.json` の `file` と実際のファイル名を比較 |
+| 拡張子が小文字か | `.jpg` ○ / `.JPG` ✕ |
+| Actions が完了しているか | GitHub の Actions タブで緑のチェックを確認 |
+| ブラウザキャッシュ | `Ctrl + Shift + R` で強制リロード |
+
+直接URLで画像にアクセスして確認する方法:
+```
+https://ユーザー名.github.io/リポジトリ名/images/work-01.jpg
+```
+このURLで画像が表示されれば、ファイルは正常にアップされています。
+
+---
+
+## よくある質問
+
+**Q: generate.py を実行したら `python: command not found` と出た**
+→ `python3 generate.py` で試してください（Mac/Linux）
+
+**Q: images.json を手動で編集してもいいですか？**
+→ OK です。ただし次回 `generate.py` を実行すると上書きされます。
+
+**Q: タイトルや年を設定したい**
+→ `images.json` を直接編集してください:
+```json
+{ "file": "work-01.jpg", "title": "息をひそめて", "year": "2023" }
+```
+
+**Q: 写真の枚数に制限はありますか？**
+→ ありません。30枚以上でもサムネイルで絞り込めます。
