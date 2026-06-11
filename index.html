@@ -839,29 +839,34 @@ async function openComplete(){
 function showCoMsg(txt){const el=document.getElementById('co-msg');el.textContent=txt;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),4000);}
 
 // ═══ INIT ════════════════════════════════════════════════
+// Wire enter button immediately — before async work
+document.getElementById('i-enter').addEventListener('click',()=>{
+  document.getElementById('intro').classList.add('gone');
+  setTimeout(showRandomInitial, 600);
+});
+
 (async()=>{
-  await loadConfig();
+  try {
+    await loadConfig();
 
-  // Pre-build all items hidden — no images loaded yet (lazy)
-  const placed=[];
-  const total=CFG.works.length;
-  CFG.works.forEach((work,i)=>{
-    const W=SIZES[Math.abs(Math.round(Math.sin(i*6.7)*2.4+2.4))%SIZES.length];
-    const H=Math.round(W*.75);
-    const pos=findFreePos(W,H,placed);
-    const rot=(Math.random()-.5)*16;
-    const wrap=makeItem(work,pos.x,pos.y,rot,true,null);
-    wrap.style.display='none'; // hidden until selected via thumb
-  });
+    // Pre-build all items hidden — no images loaded yet (lazy)
+    const placed=[];
+    CFG.works.forEach((work,i)=>{
+      const W=SIZES[Math.abs(Math.round(Math.sin(i*6.7)*2.4+2.4))%SIZES.length];
+      const H=Math.round(W*.75);
+      const pos=findFreePos(W,H,placed);
+      const rot=(Math.random()-.5)*16;
+      const wrap=makeItem(work,pos.x,pos.y,rot,true,null);
+      wrap.style.display='none';
+    });
 
-  buildThumbBar();
-  document.getElementById('loading').classList.add('gone');
-
-  // After intro: auto-show random INITIAL_SHOW with animation
-  document.getElementById('i-enter').addEventListener('click',()=>{
-    document.getElementById('intro').classList.add('gone');
-    setTimeout(showRandomInitial, 600);
-  });
+    buildThumbBar();
+  } catch(e){
+    console.error('Init error:', e);
+  } finally {
+    // Always hide loading screen, even if something went wrong
+    document.getElementById('loading').classList.add('gone');
+  }
 })();
 </script>
 </body>
