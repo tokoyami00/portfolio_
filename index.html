@@ -8,6 +8,13 @@
 <meta property="og:title" content="常闇 — canvas note">
 <meta property="og:description" content="写真を並べて、あなただけのキャンバスをつくる">
 <meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="dns-prefetch" href="https://fonts.gstatic.com">
+<!-- Preload images.json so config is ready instantly -->
+<link rel="preload" href="images.json" as="fetch" crossorigin>
+<!-- Performance hints -->
+<meta http-equiv="x-dns-prefetch-control" content="on">
+<link rel="preload" href="images.json" as="fetch" crossorigin>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -18,9 +25,9 @@
 }
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
   font-family:Georgia,'Times New Roman',serif;color:var(--ink);}
-body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;opacity:.03;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size:128px;mix-blend-mode:multiply;}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;opacity:.028;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:96px;mix-blend-mode:multiply;}
 
 /* CURSOR */
 #cur{position:fixed;width:5px;height:5px;border-radius:50%;background:var(--ink);pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:multiply;}
@@ -292,7 +299,7 @@ const ITEM_MAX_H = 340, MIN_W = 75, MAX_W = 450;
 
 async function loadConfig(){
   try{
-    const r = await fetch('images.json?v='+Date.now());
+    const r = await fetch('images.json', {cache:'no-cache'});
     if(!r.ok) throw 0;
     CFG = await r.json();
     document.title = `${CFG.artist.name} — canvas note`;
@@ -344,7 +351,11 @@ function initAudio(){
 }
 const sBtn=document.getElementById('snd-btn'),wbs=document.querySelectorAll('.wb'),sLbl=document.getElementById('snd-lbl');
 sBtn.addEventListener('click',()=>{
-  initAudio(); sOn=!sOn;
+  // Defer audio init to idle time so it doesn't block first interaction
+  if('requestIdleCallback' in window) requestIdleCallback(initAudio);
+  else setTimeout(initAudio,0);
+  sOn=!sOn;
+  if(!mGain) return; // audio not yet initialized
   mGain.gain.cancelScheduledValues(actx.currentTime);
   mGain.gain.setValueAtTime(mGain.gain.value,actx.currentTime);
   mGain.gain.linearRampToValueAtTime(sOn?.65:0,actx.currentTime+1.4);
@@ -365,26 +376,40 @@ function rnd(min,max){ return Math.floor(Math.random()*(max-min))+min; }
 function shuffle(arr){ return arr.slice().sort(()=>Math.random()-.5); }
 
 // ─── No-overlap layout ───────────────────────────────────
-// Returns a position that doesn't overlap existing placed rects
+// Grid-based placement with jitter — guarantees no overlap
 function findFreePos(W, H, placed){
-  const margin = 20;
+  const M = 24; // gap between photos
   const boardW = board.offsetWidth, boardH = board.offsetHeight;
-  const top = 105, bottom = boardH - 90;
-  for(let attempt=0; attempt<120; attempt++){
-    const x = rnd(20, Math.max(21, boardW - W - 20));
-    const y = rnd(top, Math.max(top+1, bottom - H));
-    const r = {x,y,w:W,h:H};
-    const ok = !placed.some(p=>{
-      return !(r.x+r.w+margin < p.x || r.x > p.x+p.w+margin ||
-               r.y+r.h+margin < p.y || r.y > p.y+p.h+margin);
-    });
-    if(ok){ placed.push(r); return {x,y}; }
+  const TOP = 108, BOTTOM = boardH - 85;
+  const rW = W + M, rH = H + M; // effective rect including margin
+
+  for(let attempt = 0; attempt < 400; attempt++){
+    const x = rnd(12, Math.max(13, boardW - W - 12));
+    const y = rnd(TOP, Math.max(TOP + 1, BOTTOM - H));
+    let ok = true;
+    for(const p of placed){
+      // AABB overlap test — note placed stores inflated rects
+      if(x < p.x + p.w && x + rW > p.x &&
+         y < p.y + p.h && y + rH > p.y){ ok = false; break; }
+    }
+    if(ok){ placed.push({x, y, w: rW, h: rH}); return {x, y}; }
   }
-  // fallback: just place with small offset
-  const last = placed[placed.length-1]||{x:50,y:120};
-  const pos = {x:(last.x+30)%Math.max(1,boardW-W), y:(last.y+30)%Math.max(1,bottom-top)+top};
-  placed.push({x:pos.x,y:pos.y,w:W,h:H});
-  return pos;
+  // Fallback: grid
+  const cols = Math.max(1, Math.floor((boardW - 24) / (W + M + 8)));
+  const idx  = placed.length;
+  const gx   = 12 + (idx % cols) * (W + M + 8);
+  const gy   = TOP + Math.floor(idx / cols) * (H + M + 8);
+  placed.push({x: gx, y: gy, w: rW, h: rH});
+  return {x: Math.min(gx, boardW - W - 12), y: Math.min(gy, BOTTOM - H)};
+}
+
+// Get real W/H of a wrap element (after image has loaded, or estimate)
+function getWH(wrap){
+  const sh = wrap.querySelector('.photo-shell');
+  if(!sh) return {w:160, h:120};
+  const w = sh.offsetWidth  || parseInt(sh.style.width)  || 160;
+  const h = sh.offsetHeight || parseInt(sh.style.height) || Math.round(w * .75);
+  return {w, h};
 }
 
 // ─── Make photo item ─────────────────────────────────────
@@ -487,10 +512,35 @@ function thumbToggle(idx, forceState){
   item.visible = newVisible;
   div.classList.toggle('active', newVisible);
   if(newVisible){
-    item.wrap.style.display='';
-    activateItem(item.wrap);
+    item.wrap.style.display = '';
+    item.wrap._loadImg && item.wrap._loadImg();
+    // Re-place to avoid overlap with currently visible items
+    const placed = portfolioItems
+      .filter(p => p.visible && p !== item)
+      .map(p => { const {w,h} = getWH(p.wrap); return {x: parseFloat(p.wrap.style.left)||0, y: parseFloat(p.wrap.style.top)||0, w, h}; });
+    function doPlace(){
+      const {w: W, h: H} = getWH(item.wrap);
+      const pos = findFreePos(W, H, placed);
+      const rot = (Math.random() - .5) * 16;
+      item.wrap.style.left      = pos.x + 'px';
+      item.wrap.style.top       = pos.y + 'px';
+      item.wrap.style.transform = `rotate(${rot}deg)`;
+      item.wrap.style.zIndex    = zTop++;
+      item.wrap.style.transition = 'opacity .6s ease, transform .7s cubic-bezier(.23,1,.32,1)';
+      item.wrap.style.opacity   = '1';
+      setTimeout(() => item.wrap.style.transition = '', 780);
+    }
+    const img = item.wrap.querySelector('img');
+    if(img && img.complete && img.naturalWidth > 0) doPlace();
+    else if(img){ const prev=img.onload; img.onload=function(){if(prev)prev.call(this);doPlace();}; if(!img.src&&img.dataset.src)img.src=img.dataset.src; }
+    else doPlace();
   } else {
-    item.wrap.style.display='none';
+    item.wrap.style.transition = 'opacity .3s ease';
+    item.wrap.style.opacity = '0';
+    setTimeout(() => {
+      item.wrap.style.display = 'none';
+      item.wrap.style.transition = '';
+    }, 320);
   }
   updateThumbCount();
 }
@@ -503,38 +553,68 @@ function updateThumbCount(){
 // Show random INITIAL_SHOW items with staggered animation + thumb highlight
 function showRandomInitial(){
   const indices = shuffle(portfolioItems.map((_,i)=>i)).slice(0, INITIAL_SHOW);
-  indices.forEach((idx,i)=>{
-    setTimeout(()=>{
+  const placed  = [];
+
+  // Pre-compute positions using known targetW (don't wait for image load)
+  const moves = indices.map(idx => {
+    const item = portfolioItems[idx];
+    const W = item.w, H = item.h; // initial estimate (updated after load)
+    const pos = findFreePos(W, H, placed);
+    const rot = (Math.random() - .5) * 16;
+    return {idx, item, pos, rot};
+  });
+
+  moves.forEach(({idx, item, pos, rot}, i) => {
+    setTimeout(() => {
       // Highlight thumb
       const div = thumbScroll.children[idx];
       if(div){
         div.classList.add('highlight');
-        setTimeout(()=>{ div.classList.remove('highlight'); div.classList.add('active'); }, 350);
+        setTimeout(() => { div.classList.remove('highlight'); div.classList.add('active'); }, 340);
       }
-      // Place without overlap
-      thumbToggle(idx, true);
-    }, i*160);
+      // Position and show
+      item.visible          = true;
+      item.wrap.style.display    = '';
+      item.wrap.style.left       = pos.x + 'px';
+      item.wrap.style.top        = pos.y + 'px';
+      item.wrap.style.transform  = `rotate(${rot}deg)`;
+      item.wrap.style.zIndex     = zTop++;
+      item.wrap.style.transition = 'opacity .55s ease, transform .65s cubic-bezier(.23,1,.32,1)';
+      item.wrap.style.opacity    = '1';
+      setTimeout(() => item.wrap.style.transition = '', 700);
+      // Start loading image
+      item.wrap._loadImg && item.wrap._loadImg();
+    }, i * 150);
   });
+  updateThumbCount();
 }
+
 
 // ─── "並べ直す" button: non-overlapping random layout ────
 function shuffleLayout(items){
-  const placed=[];
-  const boardW=board.offsetWidth, boardH=board.offsetHeight;
-  items.forEach(item=>{
-    const entry = Array.isArray(item) ? null : item;
-    const wrap  = entry ? entry.wrap : item;
-    if(!wrap || wrap.style.display==='none') return;
-    const shell = wrap.querySelector('.photo-shell');
-    const W = shell ? shell.offsetWidth  : 160;
-    const H = shell ? shell.offsetHeight : 120;
+  // Shuffle order first so arrangement differs each time
+  const wraps = shuffle(
+    items.map(item => item && item.wrap ? item.wrap : item)
+  ).filter(w => w && w.style.display !== 'none');
+
+  // Collect all positions up front (no stagger in findFreePos loop)
+  const placed = [];
+  const moves  = wraps.map(wrap => {
+    const {w: W, h: H} = getWH(wrap);
     const pos = findFreePos(W, H, placed);
-    const rot = (Math.random()-.5)*16;
-    wrap.style.transition='left .55s cubic-bezier(.23,1,.32,1),top .55s cubic-bezier(.23,1,.32,1),transform .55s cubic-bezier(.23,1,.32,1)';
-    wrap.style.left = pos.x+'px';
-    wrap.style.top  = pos.y+'px';
-    wrap.style.transform = `rotate(${rot}deg)`;
-    setTimeout(()=>wrap.style.transition='',600);
+    return {wrap, pos, rot: (Math.random() - .5) * 16};
+  });
+
+  // Apply with stagger animation
+  moves.forEach(({wrap, pos, rot}, i) => {
+    setTimeout(() => {
+      wrap.style.transition = 'left .48s cubic-bezier(.23,1,.32,1),top .48s,transform .48s';
+      wrap.style.left      = pos.x + 'px';
+      wrap.style.top       = pos.y + 'px';
+      wrap.style.transform = `rotate(${rot}deg)`;
+      wrap.style.zIndex    = zTop++;
+      setTimeout(() => wrap.style.transition = '', 520);
+    }, i * 50);
   });
 }
 
@@ -642,21 +722,9 @@ document.getElementById('tab-portfolio').addEventListener('click',()=>switchMode
 document.getElementById('tab-visitor').addEventListener('click',()=>switchMode('visitor'));
 
 // ─── RESET (portfolio) ───────────────────────────────────
-document.getElementById('btn-reset').addEventListener('click',()=>{
-  const placed=[];
-  portfolioItems.forEach(item=>{
-    if(!item.visible) return;
-    const shell=item.wrap.querySelector('.photo-shell');
-    const W=shell?shell.offsetWidth:item.w;
-    const H=shell?shell.offsetHeight:item.h;
-    const pos=findFreePos(W,H,placed);
-    const rot=(Math.random()-.5)*16;
-    item.wrap.style.transition='left .6s cubic-bezier(.23,1,.32,1),top .6s,transform .6s';
-    item.wrap.style.left=pos.x+'px';item.wrap.style.top=pos.y+'px';item.wrap.style.transform=`rotate(${rot}deg)`;
-    setTimeout(()=>item.wrap.style.transition='',680);
-  });
+document.getElemdocument.getElementById('btn-reset').addEventListener('click',()=>{
+  shuffleLayout(portfolioItems.filter(x=>x.visible));
 });
-
 // ═══ UPLOAD ══════════════════════════════════════════════
 const fileInput=document.getElementById('file-input'), dropOverlay=document.getElementById('drop-overlay');
 dropOverlay.addEventListener('click',()=>fileInput.click());
