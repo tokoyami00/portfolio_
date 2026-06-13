@@ -8,6 +8,8 @@
 <meta property="og:title" content="常闇 — canvas note">
 <meta property="og:description" content="写真を並べて、あなただけのキャンバスをつくる">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#f6f2ec">
+<link rel="preload" href="images.json" as="fetch" crossorigin>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -58,7 +60,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;o
 @keyframes w4{0%,100%{height:8px}50%{height:3px}}
 
 /* BOARD */
-#board{position:fixed;inset:0;z-index:10;overflow:hidden;cursor:none;}
+#board{position:fixed;inset:0;z-index:10;overflow:hidden;cursor:none;contain:layout style;}
 
 /* PHOTO ITEM */
 .photo-item{position:absolute;cursor:none;user-select:none;transform-origin:center;will-change:transform;}
@@ -67,7 +69,9 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;o
 .photo-item:hover .photo-shell{box-shadow:0 12px 40px var(--sh);}
 .photo-item.dragging .photo-shell{box-shadow:0 22px 56px rgba(24,20,14,.18);}
 .photo-shell img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;
-  filter:saturate(.68) contrast(.92) brightness(1.06);transition:filter .28s,opacity .5s;opacity:0;position:relative;z-index:1;}
+  filter:saturate(.68) contrast(.92) brightness(1.06);transition:filter .28s,opacity .5s;opacity:0;position:relative;z-index:1;
+  /* tell browser exact render size to avoid decode at full resolution */
+  image-rendering:auto;}
 .photo-shell img.loaded{opacity:1;}
 .photo-item:hover .photo-shell img{filter:saturate(.78) contrast(.95) brightness(1.09);}
 .tape{position:absolute;pointer-events:none;background:rgba(210,192,158,.34);}
@@ -230,7 +234,6 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;o
   <div id="tctrl">
     <span id="tlbl">表示する作品</span>
     <div class="tsep"></div>
-    <button class="tcb" id="tb-all">すべて</button>
     <button class="tcb" id="tb-none">なし</button>
     <button class="tcb" id="tb-rnd">ランダム10</button>
     <div class="tsep"></div>
@@ -420,6 +423,8 @@ function getWH(wrap){
 function makeItem(work, x, y, rot, isPort, imgSrc){
   var n = portItems.length + visItems.length;
   var tW = SIZES[Math.abs(Math.round(Math.sin(n*6.7)*2.4+2.4)) % SIZES.length];
+  // Use pre-computed ratio from images.json if available (prevents layout shift)
+  var tH = work.ratio ? Math.min(Math.round(tW * work.ratio), ITEM_MAX_H) : Math.round(tW*.75);
 
   var wrap = document.createElement('div');
   wrap.className = 'photo-item';
@@ -428,7 +433,7 @@ function makeItem(work, x, y, rot, isPort, imgSrc){
   var shell = document.createElement('div');
   shell.className = 'photo-shell';
   shell.style.width = tW+'px';
-  shell.style.height = Math.round(tW*.75)+'px';
+  shell.style.height = tH+'px';
 
   var img = document.createElement('img');
   img.dataset.src = imgSrc || ('images/'+work.file);
@@ -436,9 +441,11 @@ function makeItem(work, x, y, rot, isPort, imgSrc){
   img.crossOrigin = 'anonymous';
 
   // Lazy load — only fetch when activated
-  wrap._load = function(){
+  wrap._load = function(priority){
     if(img.src && img.src !== window.location.href) return;
     img.src = img.dataset.src;
+    img.decoding = 'async';
+    if(priority) img.fetchpriority = 'high';
     img.onload = function(){
       img.classList.add('loaded');
       var ratio = img.naturalHeight/img.naturalWidth;
@@ -461,19 +468,19 @@ function makeItem(work, x, y, rot, isPort, imgSrc){
   makeDrag(wrap);
   makeResize(wrap,rh);
 
-  if(isPort) portItems.push({wrap:wrap,work:work,visible:false,w:tW,h:Math.round(tW*.75)});
+  if(isPort) portItems.push({wrap:wrap,work:work,visible:false,w:tW,h:tH});
   else       visItems.push(wrap);
 
   return wrap;
 }
 
-function showItem(wrap, x, y, rot){
+function showItem(wrap, x, y, rot, priority){
   wrap.style.left  = x+'px';
   wrap.style.top   = y+'px';
   wrap.style.transform = 'rotate('+rot+'deg)';
   wrap.style.zIndex = zTop++;
   wrap.style.display = '';
-  wrap._load();
+  wrap._load(priority);
   wrap.style.transition = 'opacity .55s ease, transform .65s cubic-bezier(.23,1,.32,1)';
   wrap.style.opacity = '1';
   setTimeout(function(){wrap.style.transition='';}, 700);
@@ -503,7 +510,11 @@ function buildThumbs(){
     var div=document.createElement('div');
     div.className='thumb'; div.dataset.i=i;
     var img=document.createElement('img');
-    img.src='images/'+item.work.file; img.loading='lazy'; img.alt='';
+    // Use thumbs/ subfolder if available, fall back to original
+    var tStem = item.work.file.split('.')[0];
+    img.src = 'images/thumbs/' + tStem + '.jpg';
+    img.onerror = function(){ this.onerror=null; this.src='images/'+item.work.file; };
+    img.loading='lazy'; img.alt=''; img.width=60; img.height=60; img.decoding='async';
     var chk=document.createElement('div'); chk.className='tchk';
     div.appendChild(img); div.appendChild(chk);
     div.addEventListener('click',function(){thumbToggle(i);});
@@ -530,7 +541,7 @@ function thumbToggle(idx, force){
     var wh=getWH(item.wrap);
     var pos=findFreePos(wh.w,wh.h,placed);
     var rot=(Math.random()-.5)*16;
-    showItem(item.wrap,pos.x,pos.y,rot);
+    showItem(item.wrap,pos.x,pos.y,rot,i<3);
   } else {
     item.wrap.style.transition='opacity .3s';
     item.wrap.style.opacity='0';
@@ -587,14 +598,13 @@ function showInitial(){
       var wh=getWH(item.wrap);
       var pos=findFreePos(wh.w,wh.h,placed);
       var rot=(Math.random()-.5)*16;
-      showItem(item.wrap,pos.x,pos.y,rot);
+      showItem(item.wrap,pos.x,pos.y,rot, i<3);
       updateCount();
     },i*160);
   });
 }
 
 // Thumb controls
-eid('tb-all').addEventListener('click',function(){portItems.forEach(function(_,i){thumbToggle(i,true);});});
 eid('tb-none').addEventListener('click',function(){portItems.forEach(function(_,i){thumbToggle(i,false);});});
 eid('tb-rnd').addEventListener('click',function(){
   portItems.forEach(function(_,i){thumbToggle(i,false);});
@@ -859,7 +869,7 @@ eid('ienter').addEventListener('click', function(){
 });
 
 // Load config then build UI
-fetch('images.json', {cache:'no-cache'})
+fetch('images.json', {cache:'no-cache', priority:'high'})
   .then(function(r){ return r.ok ? r.json() : Promise.reject('not found'); })
   .then(function(data){
     CFG = data;
@@ -870,6 +880,14 @@ fetch('images.json', {cache:'no-cache'})
   })
   .catch(function(e){ console.warn('images.json:', e); })
   .finally(function(){
+    // Preload first 3 visible images (browser hint, high-priority)
+    CFG.works.slice(0,3).forEach(function(w){
+      var lnk=document.createElement('link');
+      lnk.rel='preload'; lnk.as='image';
+      lnk.href='images/'+w.file;
+      document.head.appendChild(lnk);
+    });
+
     // Build items (all hidden, no images fetched yet)
     var placed=[];
     CFG.works.forEach(function(work,i){
